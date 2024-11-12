@@ -1,0 +1,17 @@
+C:\Users\arunk\source\repos\NXOpenCS\NXOpenCS\bin\Debug\NXOpenCS.dll
+C:\Users\arunk\source\repos\NXOpenCS\NXOpenCS\bin\Debug\NXOpenCS.pdb
+C:\Users\arunk\source\repos\NXOpenCS\NXOpenCS\bin\Debug\NXOpen.dll
+C:\Users\arunk\source\repos\NXOpenCS\NXOpenCS\bin\Debug\NXOpen.Guide.dll
+C:\Users\arunk\source\repos\NXOpenCS\NXOpenCS\bin\Debug\NXOpen.UF.dll
+C:\Users\arunk\source\repos\NXOpenCS\NXOpenCS\bin\Debug\NXOpen.Utilities.dll
+C:\Users\arunk\source\repos\NXOpenCS\NXOpenCS\bin\Debug\NXOpenUI.dll
+C:\Users\arunk\source\repos\NXOpenCS\NXOpenCS\bin\Debug\NXOpen.xml
+C:\Users\arunk\source\repos\NXOpenCS\NXOpenCS\bin\Debug\NXOpen.Guide.xml
+C:\Users\arunk\source\repos\NXOpenCS\NXOpenCS\bin\Debug\NXOpen.UF.xml
+C:\Users\arunk\source\repos\NXOpenCS\NXOpenCS\bin\Debug\NXOpen.Utilities.xml
+C:\Users\arunk\source\repos\NXOpenCS\NXOpenCS\bin\Debug\NXOpenUI.xml
+C:\Users\arunk\source\repos\NXOpenCS\NXOpenCS\obj\Debug\NXOpenCS.csproj.AssemblyReference.cache
+C:\Users\arunk\source\repos\NXOpenCS\NXOpenCS\obj\Debug\NXOpenCS.csproj.CoreCompileInputs.cache
+C:\Users\arunk\source\repos\NXOpenCS\NXOpenCS\obj\Debug\NXOpenCS.csproj.Up2Date
+C:\Users\arunk\source\repos\NXOpenCS\NXOpenCS\obj\Debug\NXOpenCS.dll
+C:\Users\arunk\source\repos\NXOpenCS\NXOpenCS\obj\Debug\NXOpenCS.pdb
