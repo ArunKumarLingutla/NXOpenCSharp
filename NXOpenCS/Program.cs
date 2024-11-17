@@ -10,9 +10,9 @@ namespace NXOpenCS
         {
             Source source = new Source();
             //Source.GetBodiesFacesEdges();
-            Source.GetAllComponents();
-            //source.CreateLine();
-            //source.CreatePointPerpendicularToLine();
+            //Source.GetAllComponents();
+            source.CreateLine();
+            source.CreatePointPerpendicularToLine();
             //source.CreateLinePerpendicularToExistingLine();
         }
         public static int GetUnloadOption(string dummy)

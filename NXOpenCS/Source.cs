@@ -5,11 +5,18 @@ using System.Collections.Generic;
 using NXOpenUI;
 using NXOpen.Assemblies;
 using System.Linq;
+using NXOpen.Annotations;
+using NXOpen.Features;
+using static NXOpen.BodyDes.OnestepUnformBuilder;
+using static NXOpen.Tooling.ScrapDesignBuilder;
+using Body = NXOpen.Body;
+using Part = NXOpen.Part;
 
 namespace NXOpenCS
 {
     public class Source
     {
+        //Taking NXSession, and collecting work and display parts from NXSession
         public static Session theSession;
         public static Part theWorkPart;
         public static Part theDisplayPart;
@@ -18,6 +25,7 @@ namespace NXOpenCS
         public static DisplayManager theDisplayManager;
         public static UI theUI;
 
+        //Collecting Bodies, Faces, and Edges and storing them in the below lists
         public static List<Body> lsBodies=new List<Body>();
         public static List<Face> lsFaces=new List<Face>();
         public static List<Edge> lsEdgesFromBodies=new List<Edge>(); //will give exact no of edges without duplicate
@@ -26,6 +34,7 @@ namespace NXOpenCS
 
         public Source()
         {
+            //Initialising the session and parts from NX when ever Object is created for source class
             theSession = NXOpen.Session.GetSession();
             theWorkPart = theSession.Parts.Work;
             theDisplayPart = theSession.Parts.Display;
@@ -189,6 +198,8 @@ namespace NXOpenCS
 
             Point movedPoint = theWorkPart.Points.CreatePoint(new Point3d(movedPt[0], movedPt[1], movedPt[2]));
             movedPoint.SetVisibility(SmartObject.VisibilityOption.Visible);
+
+            CreatingPlanes(movedPoint);
         }
 
         public void CreateLinePerpendicularToExistingLine()
@@ -246,6 +257,71 @@ namespace NXOpenCS
             );
 
             Line newPerpendicularLine = theWorkPart.Curves.CreateLine(midPoint,perpendicularEndPointForNewLine);
+        }
+
+        public void CreatingPlanes(Point startPoint)
+        {
+            //For creating a plane we need origin(Point3d) and Matrix3X3
+            //Creating plane along XY Plane normal to Z axis
+            //In this case Matrix components will be ->Xaxis(1,0,0)    Yaxis(0,1,0)    Zaxis(0,0,1)
+            //along YZ plane Normal to X axis       -> Xaxis(0,0,1)    Yaxis(0,1,0)    Zaxis(1,0,0)
+            //along ZX plane Normal to Y axis       -> Xaxis(1,0,0)    Yaxis(0,0,1)    Zaxis(0,1,0)
+
+            //Lets create a plane via a point which is create on above method, along XY plane by taking workPart matrix
+            Matrix3x3 wcsMatrix = theWorkPart.WCS.CoordinateSystem.Orientation.Element;  //This will collect Matrix along XY
+            Point3d origin=new Point3d(startPoint.Coordinates.X,startPoint.Coordinates.Y,startPoint.Coordinates.Z);
+            DatumPlane sketchPlane=theWorkPart.Datums.CreateFixedDatumPlane(origin, wcsMatrix);
+
+            lw.WriteLine(("Xx = "+wcsMatrix.Xx, "Xy = " + wcsMatrix.Xy, "Xz = " + wcsMatrix.Xz).ToString());
+            lw.WriteLine(("Yx = "+wcsMatrix.Yx, "Yy = " + wcsMatrix.Yy, "Yz = " + wcsMatrix.Yz).ToString());
+            lw.WriteLine(("Zx = "+wcsMatrix.Zx, "Zy = " + wcsMatrix.Zy, "Zz = " + wcsMatrix.Zz).ToString());
+
+            //Creating plane via point, along XZ axis and normal to Y
+            Matrix3x3 xzMatrix=new Matrix3x3();
+            xzMatrix.Xx=1; xzMatrix.Xy=0; xzMatrix.Xz=0;
+            xzMatrix.Yx=0; xzMatrix.Yy=0;xzMatrix.Yz=1;
+            xzMatrix.Zx=0;xzMatrix.Zy=1;xzMatrix.Zz=0;
+
+            DatumPlane xzPlane = theWorkPart.Datums.CreateFixedDatumPlane(origin,xzMatrix);
+
+
+            //Creating a plane with some angle
+            // Calculate components of the normal vector
+            //CreateFixedDatumPlane:
+                // Use when you need a persistent and reusable reference plane for building features.
+                //Example: Creating a sketch plane that stays in the part's feature tree.
+            //CreateFixedPlane:
+                // Use when you need a temporary plane for programmatic calculations or intermediate steps.
+                //Example: Finding where a plane intersects a body without adding a datum plane to the model.
+            
+            Point3d originOriginal=new Point3d(0,0,0);
+            double angleInRadians = 53 * (Math.PI / 180.0); // Convert degrees to radians
+            double normalZ = Math.Sin(angleInRadians); // Z-component
+            double normalXY = Math.Cos(angleInRadians); // Length in XY plane
+
+            // 1. Plane normal to Z (tilted 53 degrees to XY)
+            Matrix3x3 matrixZ = new Matrix3x3();
+            matrixZ.Xx = normalXY; matrixZ.Xy = 0.0; matrixZ.Xz = -normalZ; // X-axis direction
+            matrixZ.Yx = 0.0; matrixZ.Yy = 1.0; matrixZ.Yz = 0.0;          // Y-axis direction
+            matrixZ.Zx = normalZ; matrixZ.Zy = 0.0; matrixZ.Zz = normalXY; // Z-axis direction (normal)
+
+            Plane planeZ = theWorkPart.Planes.CreateFixedPlane(originOriginal, matrixZ);
+
+            // 2. Plane normal to X (tilted 53 degrees to YZ)
+            Matrix3x3 matrixX = new Matrix3x3();
+            matrixX.Xx = 1.0; matrixX.Xy = 0.0; matrixX.Xz = 0.0;          // X-axis direction
+            matrixX.Yx = 0.0; matrixX.Yy = normalXY; matrixX.Yz = normalZ; // Y-axis direction
+            matrixX.Zx = 0.0; matrixX.Zy = -normalZ; matrixX.Zz = normalXY; // Z-axis direction (normal)
+
+            Plane planeX = theWorkPart.Planes.CreateFixedPlane(originOriginal, matrixX);
+
+            // 3. Plane normal to Y (tilted 53 degrees to ZX)
+            Matrix3x3 matrixY = new Matrix3x3();
+            matrixY.Xx = normalXY; matrixY.Xy = normalZ; matrixY.Xz = 0.0; // X-axis direction
+            matrixY.Yx = -normalZ; matrixY.Yy = normalXY; matrixY.Yz = 0.0; // Y-axis direction
+            matrixY.Zx = 0.0; matrixY.Zy = 0.0; matrixY.Zz = 1.0;          // Z-axis direction (normal)
+
+            Plane planeY = theWorkPart.Planes.CreateFixedPlane(originOriginal, matrixY);
         }
     }
 }
