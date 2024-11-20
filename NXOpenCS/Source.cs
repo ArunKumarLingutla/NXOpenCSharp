@@ -9,6 +9,7 @@ using NXOpen.Annotations;
 using NXOpen.Features;
 using static NXOpen.BodyDes.OnestepUnformBuilder;
 using static NXOpen.Tooling.ScrapDesignBuilder;
+using System.IO;
 using Body = NXOpen.Body;
 using Part = NXOpen.Part;
 
@@ -30,6 +31,9 @@ namespace NXOpenCS
         public static List<Face> lsFaces=new List<Face>();
         public static List<Edge> lsEdgesFromBodies=new List<Edge>(); //will give exact no of edges without duplicate
 
+        List<NXOpen.Assemblies.Component> assemblies;
+        List<NXOpen.Assemblies.Component> components;
+
         public static Line line;
 
         public Source()
@@ -45,16 +49,16 @@ namespace NXOpenCS
             theUI = NXOpen.UI.GetUI();
         }
 
-        public static void GetAllComponents()
+        public void GetAllComponents()
         {
             //Get all parts open in the session
             //If it is an assembly, it gets all the components along with assembly, if ypu have 2 parts in an assembly it will give 3
-            PartCollection partList=theSession.Parts;
-            lw.WriteLine(Convert.ToString(partList.ToArray().Length));
+            //PartCollection partList=theSession.Parts;
+            //lw.WriteLine(Convert.ToString(partList.ToArray().Length));
 
             //Getting all the sub assemblies and components in the assembly
-            List<NXOpen.Assemblies.Component> assemblies = new List<Component>(); 
-            List<NXOpen.Assemblies.Component> components = new List<Component>(); 
+            assemblies = new List<Component>(); 
+            components = new List<Component>(); 
 
             try
             {
@@ -85,17 +89,7 @@ namespace NXOpenCS
                     assemblies=allChildComponents.Where(x=>x.GetChildren().Length!=0).ToList();
                     components=allChildComponents.Where(x=>x.GetChildren().Length==0).ToList();
 
-                    lw.WriteLine("Assemblies in "+rootComponent.DisplayName+" are: ");
-                    foreach (Component component in assemblies)
-                    {
-                        lw.WriteLine(component.DisplayName);
-                    }
-
-                    lw.WriteLine("Components in " + rootComponent.DisplayName + " are: ");
-                    foreach (Component component in components)
-                    {
-                        lw.WriteLine(component.DisplayName);
-                    }
+                    
                 }
             }
             catch (Exception ex)
@@ -104,29 +98,118 @@ namespace NXOpenCS
             }
         }
 
-        public static void GetBodiesFacesEdges()
+        public void GetBodies()
         {
             try
             {
-                //BodyCollection bodies = theWorkPart.Bodies;
-
-                Body[] bodiesArray = theWorkPart.Bodies.ToArray();
-                lsBodies.AddRange(bodiesArray);
-
-                foreach (Body body in bodiesArray)
+                //If the 
+                if (theDisplayPart != null && theDisplayPart.ComponentAssembly.RootComponent is null)
                 {
-                    lsFaces.AddRange(body.GetFaces());
-                    lsEdgesFromBodies.AddRange(body.GetEdges());
+                    lsBodies.AddRange(theDisplayPart.Bodies.ToArray());
                 }
-
-                theUI.NXMessageBox.Show("Out put", NXMessageBox.DialogType.Information, 
-                    "No of bodies: "+Convert.ToString(lsBodies.Count) +
-                    "No of Faces: "+ Convert.ToString(lsFaces.Count)+
-                    "No of Edges"+ Convert.ToString(lsEdgesFromBodies.Count)
-                );
+                else 
+                { 
+                    GetAllComponents();
+                    foreach (Component component in components)
+                    {
+                        Part part = component.Prototype as Part;
+                        lsBodies.AddRange(part.Bodies.ToArray());
+                    }
+                }
             }
             catch (Exception ex) { 
                 theUI.NXMessageBox.Show("Error", NXMessageBox.DialogType.Error, Convert.ToString(ex.Message));
+            }
+        }
+
+        public void GetFaces()
+        {
+            if (lsBodies.Count==0)
+            {
+                GetBodies();
+            }
+
+            foreach (Body body in lsBodies)
+            {
+                lsFaces.AddRange(body.GetFaces());
+            }
+        }
+        public void GetEdges()
+        {
+            if (lsBodies.Count ==0)
+            {
+                GetBodies();
+            }
+
+            foreach (Body body in lsBodies)
+            {
+                lsEdgesFromBodies.AddRange(body.GetEdges());
+            }
+        }
+        public void DisplayInfoInLW()
+        {
+            GetBodies();
+            GetFaces();
+            GetEdges();
+
+            lw.WriteLine($"No Of Bodies: {lsBodies.Count}");
+            lw.WriteLine($"No Of Faces: {lsFaces.Count}");
+            lw.WriteLine($"No Of Edges: {lsEdgesFromBodies.Count}");
+
+            if (!(theDisplayPart.ComponentAssembly.RootComponent is null))
+            {
+                if (assemblies.Count>0)
+                {
+                    lw.WriteLine("Assemblies in " + theDisplayPart.ComponentAssembly.RootComponent.DisplayName + " are: ");
+                    foreach (Component component in assemblies)
+                    {
+                        lw.WriteLine(component.DisplayName);
+                    } 
+                }
+
+                if (components.Count>0)
+                {
+                    lw.WriteLine("Components in " + theDisplayPart.ComponentAssembly.RootComponent.DisplayName + " are: ");
+                    foreach (Component component in components)
+                    {
+                        lw.WriteLine(component.DisplayName);
+                    }  
+                }
+            }
+        }
+
+        public void AddComponentsToAssembly()
+        {
+            string folderPath=Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+            if (!Directory.Exists(folderPath))
+            {
+                lw.WriteLine("Folder does not exists...");
+            }
+            else
+            {
+                string[] partFiles=Directory.GetFiles(folderPath,"*.prt");
+                if (partFiles.Length==0)
+                {
+                    lw.WriteLine($"No part files present in {folderPath}");
+                }
+
+                else
+                {
+                    foreach (string partFile in partFiles)
+                    {
+                        string referenceSetName = "Entire Part";
+                        string componentName = Path.GetFileNameWithoutExtension(partFile);
+                        Point3d basePoint = new Point3d(0, 0, 0);
+                        Matrix3x3 wcsMatrix = theWorkPart.WCS.CoordinateSystem.Orientation.Element;
+                        int layer = -1;
+                        PartLoadStatus partLoadStatus;
+
+                        Component newComponent = theWorkPart.ComponentAssembly.AddComponent
+                            (partFile, referenceSetName, componentName, basePoint, wcsMatrix, layer, out partLoadStatus);
+                        lw.WriteLine($"Part Loaded: {componentName}");
+                    }
+                    theWorkPart.Save(BasePart.SaveComponents.False, BasePart.CloseAfterSave.False); 
+                }
             }
         }
 
@@ -322,6 +405,32 @@ namespace NXOpenCS
             matrixY.Zx = 0.0; matrixY.Zy = 0.0; matrixY.Zz = 1.0;          // Z-axis direction (normal)
 
             Plane planeY = theWorkPart.Planes.CreateFixedPlane(originOriginal, matrixY);
+
+            SketchInPlaceBuilder sketchInPlaceBuilder = theWorkPart.Sketches.CreateSketchInPlaceBuilder2(null);
+
+            //sketchInPlaceBuilder.plan = sketchPlane;
+            //sketchInPlaceBuilder.PlaneReference.Direction = Sketch.Direction.Normal; // Sketch normal to the plane
+
+            //Sketch sketch = sketchInPlaceBuilder.Commit();
+            //sketchInPlaceBuilder.Destroy();
+
+            //// Step 3: Add Geometry to the Sketch
+            //sketch.Open(); // Enter sketch editing mode
+
+            //Sketch.LineBuilder lineBuilder = sketch.CreateLine();
+            //Point3d startPoint = new Point3d(0.0, 0.0, 0.0);
+            //Point3d endPoint = new Point3d(100.0, 0.0, 0.0);
+            //lineBuilder.StartPoint = startPoint;
+            //lineBuilder.EndPoint = endPoint;
+            //lineBuilder.Commit();
+
+            //sketch.Close(); // Exit sketch editing mode
+
+            //// Finalize
+            //theSession.UpdateManager.DoUpdate(new Session.UpdateHint[] { });
+
         }
+
+
     }
 }

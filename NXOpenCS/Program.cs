@@ -9,10 +9,12 @@ namespace NXOpenCS
         public static void Main(string[] args)
         {
             Source source = new Source();
-            //Source.GetBodiesFacesEdges();
+            //Source.GetBodies();
             //Source.GetAllComponents();
-            source.CreateLine();
-            source.CreatePointPerpendicularToLine();
+            source.AddComponentsToAssembly();
+            source.DisplayInfoInLW();
+            //source.CreateLine();
+            //source.CreatePointPerpendicularToLine();
             //source.CreateLinePerpendicularToExistingLine();
         }
         public static int GetUnloadOption(string dummy)
