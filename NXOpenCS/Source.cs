@@ -180,36 +180,44 @@ namespace NXOpenCS
 
         public void AddComponentsToAssembly()
         {
-            string folderPath=Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+            try
+            {
+                string folderPath=Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
             if (!Directory.Exists(folderPath))
             {
                 lw.WriteLine("Folder does not exists...");
             }
-            else
-            {
-                string[] partFiles=Directory.GetFiles(folderPath,"*.prt");
-                if (partFiles.Length==0)
-                {
-                    lw.WriteLine($"No part files present in {folderPath}");
-                }
 
                 else
                 {
-                    foreach (string partFile in partFiles)
+                    string[] partFiles = Directory.GetFiles(folderPath, "*.prt");
+                    if (partFiles.Length == 0)
                     {
-                        string referenceSetName = "Entire Part";
-                        string componentName = Path.GetFileNameWithoutExtension(partFile);
-                        Point3d basePoint = new Point3d(0, 0, 0);
-                        Matrix3x3 wcsMatrix = theWorkPart.WCS.CoordinateSystem.Orientation.Element;
-                        int layer = -1;
-                        PartLoadStatus partLoadStatus;
-
-                        Component newComponent = theWorkPart.ComponentAssembly.AddComponent
-                            (partFile, referenceSetName, componentName, basePoint, wcsMatrix, layer, out partLoadStatus);
-                        lw.WriteLine($"Part Loaded: {componentName}");
+                        lw.WriteLine($"No part files present in {folderPath}");
                     }
-                    theWorkPart.Save(BasePart.SaveComponents.False, BasePart.CloseAfterSave.False); 
+
+                    else
+                    {
+                        foreach (string partFile in partFiles)
+                        {
+                            string referenceSetName = "Entire Part";
+                            string componentName = Path.GetFileNameWithoutExtension(partFile);
+                            Point3d basePoint = new Point3d(0, 0, 0);
+                            Matrix3x3 wcsMatrix = theWorkPart.WCS.CoordinateSystem.Orientation.Element;
+                            int layer = -1;
+                            PartLoadStatus partLoadStatus;
+
+                            Component newComponent = theWorkPart.ComponentAssembly.AddComponent
+                                (partFile, referenceSetName, componentName, basePoint, wcsMatrix, layer, out partLoadStatus);
+                            lw.WriteLine($"Part Loaded: {componentName}");
+                        }
+                        theWorkPart.Save(BasePart.SaveComponents.False, BasePart.CloseAfterSave.False);
+                    }
                 }
+            }
+            catch (NXException e)
+            {
+                theUI.NXMessageBox.Show("Exception", NXMessageBox.DialogType.Error, e.Message.ToString());
             }
         }
 
@@ -431,6 +439,20 @@ namespace NXOpenCS
 
         }
 
+        public void GetDirections()
+        {
+            int faceType;
+            double[] pointInfo= new double[3];
+            double[] direction= new double[3];
+            double[] box= new double[6];
+            double radius;
+            double radData;
+            int normDir;
+            theUFSession.Modl.AskFaceData(lsFaces[0].Tag, out faceType, pointInfo, direction, box, out radius, out radData, out normDir);
 
+            lw.WriteLine(Convert.ToString(direction[0]));
+            lw.WriteLine(Convert.ToString(direction[1]));
+            lw.WriteLine(Convert.ToString(direction[2]));
+        }
     }
 }

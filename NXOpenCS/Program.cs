@@ -11,8 +11,9 @@ namespace NXOpenCS
             Source source = new Source();
             //Source.GetBodies();
             //Source.GetAllComponents();
-            source.AddComponentsToAssembly();
+            //source.AddComponentsToAssembly();
             source.DisplayInfoInLW();
+            source.GetDirections();
             //source.CreateLine();
             //source.CreatePointPerpendicularToLine();
             //source.CreateLinePerpendicularToExistingLine();
