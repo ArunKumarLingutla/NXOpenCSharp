@@ -12,6 +12,7 @@ using static NXOpen.Tooling.ScrapDesignBuilder;
 using System.IO;
 using Body = NXOpen.Body;
 using Part = NXOpen.Part;
+using NXOpen.Markup;
 
 namespace NXOpenCS
 {
@@ -19,7 +20,7 @@ namespace NXOpenCS
     {
         //Taking NXSession, and collecting work and display parts from NXSession
         public static Session theSession;
-        public static Part theWorkPart;
+        public static Part workPart;
         public static Part theDisplayPart;
         public static ListingWindow lw;
         public static UFSession theUFSession;
@@ -27,9 +28,10 @@ namespace NXOpenCS
         public static UI theUI;
 
         //Collecting Bodies, Faces, and Edges and storing them in the below lists
-        public static List<Body> lsBodies=new List<Body>();
-        public static List<Face> lsFaces=new List<Face>();
-        public static List<Edge> lsEdgesFromBodies=new List<Edge>(); //will give exact no of edges without duplicate
+        public static List<Body> lsBodies = new List<Body>();
+        public static List<Face> lsFaces = new List<Face>();
+        public static List<Edge> lsEdgesFromFaces = new List<Edge>();
+        public static List<Edge> lsEdgesFromBodies = new List<Edge>(); //will give exact no of edges without duplicate
 
         List<NXOpen.Assemblies.Component> assemblies;
         List<NXOpen.Assemblies.Component> components;
@@ -40,7 +42,7 @@ namespace NXOpenCS
         {
             //Initialising the session and parts from NX when ever Object is created for source class
             theSession = NXOpen.Session.GetSession();
-            theWorkPart = theSession.Parts.Work;
+            workPart = theSession.Parts.Work;
             theDisplayPart = theSession.Parts.Display;
             theDisplayManager = theSession.DisplayManager;
             lw = theSession.ListingWindow;
@@ -57,8 +59,8 @@ namespace NXOpenCS
             //lw.WriteLine(Convert.ToString(partList.ToArray().Length));
 
             //Getting all the sub assemblies and components in the assembly
-            assemblies = new List<Component>(); 
-            components = new List<Component>(); 
+            assemblies = new List<Component>();
+            components = new List<Component>();
 
             try
             {
@@ -67,29 +69,29 @@ namespace NXOpenCS
                 {
                     lw.WriteLine("It is not an assembly");
                 }
-                else 
-                { 
-                    NXOpen.Assemblies.Component rootComponent=theDisplayPart.ComponentAssembly.RootComponent;
+                else
+                {
+                    NXOpen.Assemblies.Component rootComponent = theDisplayPart.ComponentAssembly.RootComponent;
 
                     //Going layer by level by level and getting all the child components
                     //storing current level components into "currentLevelComponents" list and traversing them to get their child components
                     //storing the child components in allChildComponents and making those child components into current level components and continuing the process
-                    List<Component> currentLevelComponents=rootComponent.GetChildren().ToList();
+                    List<Component> currentLevelComponents = rootComponent.GetChildren().ToList();
                     List<Component> allChildComponents = rootComponent.GetChildren().ToList();
-                    while (true) 
-                    { 
+                    while (true)
+                    {
                         //Getting child components of current level and adding it to allChildComponents, if there are no child components loop terminates
-                        List<Component> childComponentsOfCurrentLevelComponents=currentLevelComponents.SelectMany(x => x.GetChildren()).ToList();
-                        if(childComponentsOfCurrentLevelComponents.Count==0) break;
+                        List<Component> childComponentsOfCurrentLevelComponents = currentLevelComponents.SelectMany(x => x.GetChildren()).ToList();
+                        if (childComponentsOfCurrentLevelComponents.Count == 0) break;
                         allChildComponents.AddRange(childComponentsOfCurrentLevelComponents);
-                        currentLevelComponents=childComponentsOfCurrentLevelComponents;
+                        currentLevelComponents = childComponentsOfCurrentLevelComponents;
                     }
 
                     //saparating assemblies and individual components from allChildComponents
-                    assemblies=allChildComponents.Where(x=>x.GetChildren().Length!=0).ToList();
-                    components=allChildComponents.Where(x=>x.GetChildren().Length==0).ToList();
+                    assemblies = allChildComponents.Where(x => x.GetChildren().Length != 0).ToList();
+                    components = allChildComponents.Where(x => x.GetChildren().Length == 0).ToList();
 
-                    
+
                 }
             }
             catch (Exception ex)
@@ -107,8 +109,8 @@ namespace NXOpenCS
                 {
                     lsBodies.AddRange(theDisplayPart.Bodies.ToArray());
                 }
-                else 
-                { 
+                else
+                {
                     GetAllComponents();
                     foreach (Component component in components)
                     {
@@ -117,14 +119,14 @@ namespace NXOpenCS
                     }
                 }
             }
-            catch (Exception ex) { 
+            catch (Exception ex) {
                 theUI.NXMessageBox.Show("Error", NXMessageBox.DialogType.Error, Convert.ToString(ex.Message));
             }
         }
 
         public void GetFaces()
         {
-            if (lsBodies.Count==0)
+            if (lsBodies.Count == 0)
             {
                 GetBodies();
             }
@@ -136,9 +138,13 @@ namespace NXOpenCS
         }
         public void GetEdges()
         {
-            if (lsBodies.Count ==0)
+            if (lsBodies.Count == 0)
             {
                 GetBodies();
+            }
+            foreach (Face face in lsFaces)
+            {
+                lsEdgesFromFaces.AddRange(face.GetEdges());
             }
 
             foreach (Body body in lsBodies)
@@ -158,22 +164,22 @@ namespace NXOpenCS
 
             if (!(theDisplayPart.ComponentAssembly.RootComponent is null))
             {
-                if (assemblies.Count>0)
+                if (assemblies.Count > 0)
                 {
                     lw.WriteLine("Assemblies in " + theDisplayPart.ComponentAssembly.RootComponent.DisplayName + " are: ");
                     foreach (Component component in assemblies)
                     {
                         lw.WriteLine(component.DisplayName);
-                    } 
+                    }
                 }
 
-                if (components.Count>0)
+                if (components.Count > 0)
                 {
                     lw.WriteLine("Components in " + theDisplayPart.ComponentAssembly.RootComponent.DisplayName + " are: ");
                     foreach (Component component in components)
                     {
                         lw.WriteLine(component.DisplayName);
-                    }  
+                    }
                 }
             }
         }
@@ -182,11 +188,11 @@ namespace NXOpenCS
         {
             try
             {
-                string folderPath=Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
-            if (!Directory.Exists(folderPath))
-            {
-                lw.WriteLine("Folder does not exists...");
-            }
+                string folderPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+                if (!Directory.Exists(folderPath))
+                {
+                    lw.WriteLine("Folder does not exists...");
+                }
 
                 else
                 {
@@ -203,15 +209,15 @@ namespace NXOpenCS
                             string referenceSetName = "Entire Part";
                             string componentName = Path.GetFileNameWithoutExtension(partFile);
                             Point3d basePoint = new Point3d(0, 0, 0);
-                            Matrix3x3 wcsMatrix = theWorkPart.WCS.CoordinateSystem.Orientation.Element;
+                            Matrix3x3 wcsMatrix = workPart.WCS.CoordinateSystem.Orientation.Element;
                             int layer = -1;
                             PartLoadStatus partLoadStatus;
 
-                            Component newComponent = theWorkPart.ComponentAssembly.AddComponent
+                            Component newComponent = workPart.ComponentAssembly.AddComponent
                                 (partFile, referenceSetName, componentName, basePoint, wcsMatrix, layer, out partLoadStatus);
                             lw.WriteLine($"Part Loaded: {componentName}");
                         }
-                        theWorkPart.Save(BasePart.SaveComponents.False, BasePart.CloseAfterSave.False);
+                        workPart.Save(BasePart.SaveComponents.False, BasePart.CloseAfterSave.False);
                     }
                 }
             }
@@ -224,8 +230,8 @@ namespace NXOpenCS
         public void CreateLine()
         {
             Point3d startPoint = new Point3d(0, 0, 0);
-            Point3d endPoint = new Point3d(0,100,100);
-            line = theWorkPart.Curves.CreateLine(startPoint, endPoint);
+            Point3d endPoint = new Point3d(0, 100, 100);
+            line = workPart.Curves.CreateLine(startPoint, endPoint);
             line.SetVisibility(SmartObject.VisibilityOption.Visible);
         }
 
@@ -240,28 +246,28 @@ namespace NXOpenCS
                 (startPoint[2] + endPoint[2]) / 2
             };
 
-            //Point midPoint = theWorkPart.Points.CreatePoint(new Point3d(
+            //Point midPoint = workPart.Points.CreatePoint(new Point3d(
             //(line.EndPoint.X + line.StartPoint.X) / 2,
             //(line.EndPoint.Y + line.StartPoint.Y) / 2,
             //(line.EndPoint.Z + line.StartPoint.Z) / 2)
             //);
 
-            Point midPoint = theWorkPart.Points.CreatePoint(new Point3d(midPt[0], midPt[1], midPt[2]));
+            Point midPoint = workPart.Points.CreatePoint(new Point3d(midPt[0], midPt[1], midPt[2]));
             midPoint.SetVisibility(SmartObject.VisibilityOption.Visible);
 
             // Calculate the direction vector of the line
             double[] lineVector = {
-                (line.EndPoint.X - line.StartPoint.X), 
-                (line.EndPoint.Y - line.StartPoint.Y), 
-                (line.EndPoint.Z - line.StartPoint.Z) 
+                (line.EndPoint.X - line.StartPoint.X),
+                (line.EndPoint.Y - line.StartPoint.Y),
+                (line.EndPoint.Z - line.StartPoint.Z)
             };
 
             //The direction vector we calculated above has a magnitude (or length) based on the distance between the start and end points.
             //However, to work with directions without scaling, we often use a unit vector—a vector with a magnitude of 1 that points in the same direction.
             //to get unit vector, divide each component of vector with length
             double length = Math.Sqrt(
-                (lineVector[0] * lineVector[0])+ 
-                (lineVector[1] * lineVector[1])+ 
+                (lineVector[0] * lineVector[0]) +
+                (lineVector[1] * lineVector[1]) +
                 (lineVector[2] * lineVector[2])
             );
 
@@ -287,7 +293,7 @@ namespace NXOpenCS
                 midPt[2]+perpendicularVector[2]*distance
             };
 
-            Point movedPoint = theWorkPart.Points.CreatePoint(new Point3d(movedPt[0], movedPt[1], movedPt[2]));
+            Point movedPoint = workPart.Points.CreatePoint(new Point3d(movedPt[0], movedPt[1], movedPt[2]));
             movedPoint.SetVisibility(SmartObject.VisibilityOption.Visible);
 
             CreatingPlanes(movedPoint);
@@ -295,15 +301,15 @@ namespace NXOpenCS
 
         public void CreateLinePerpendicularToExistingLine()
         {
-            
+
             //In CreatePointPerpendicularToLine method we used double[] array to store coordinates and vectors,
             //so here we try to use point3d and vector3d to store coordinates and vectors
 
             //Calculating Mid Point from start and end points, by adding and dividing the corresponding components by 2
-            Point3d startPoint =line.StartPoint;
+            Point3d startPoint = line.StartPoint;
             Point3d endPoint = line.EndPoint;
 
-            Point3d midPoint =new Point3d( 
+            Point3d midPoint = new Point3d(
                 (startPoint.X + endPoint.X) / 2,
                 (startPoint.Y + endPoint.Y) / 2,
                 (startPoint.Z + endPoint.Z) / 2
@@ -319,16 +325,16 @@ namespace NXOpenCS
 
             //Calculate magnitude or length of the original line to calculate unit vector
             double length = Math.Sqrt(
-                (directionVectorOfOriginalLine.X* directionVectorOfOriginalLine.X)+ 
-                (directionVectorOfOriginalLine.Y * directionVectorOfOriginalLine.Y)+ 
+                (directionVectorOfOriginalLine.X * directionVectorOfOriginalLine.X) +
+                (directionVectorOfOriginalLine.Y * directionVectorOfOriginalLine.Y) +
                 (directionVectorOfOriginalLine.Z * directionVectorOfOriginalLine.Z)
             );
 
             //unit vector of original line
             Vector3d unitVectorOfOriginalLine = new Vector3d(
-                directionVectorOfOriginalLine.X/length,
-                directionVectorOfOriginalLine.Y/length,
-                directionVectorOfOriginalLine.Z/length
+                directionVectorOfOriginalLine.X / length,
+                directionVectorOfOriginalLine.Y / length,
+                directionVectorOfOriginalLine.Z / length
             );
 
             //Perpendicuar direction vector, let us assume it on YZ plane,
@@ -342,12 +348,12 @@ namespace NXOpenCS
             //Perpendicular end point for new line
             double lengthOfNewLine = 30;
             Point3d perpendicularEndPointForNewLine = new Point3d(
-                midPoint.X+unitVectorOfNewLine.X*lengthOfNewLine,
-                midPoint.Y+unitVectorOfNewLine.Y*lengthOfNewLine,
-                midPoint.Z+unitVectorOfNewLine.Z*lengthOfNewLine
+                midPoint.X + unitVectorOfNewLine.X * lengthOfNewLine,
+                midPoint.Y + unitVectorOfNewLine.Y * lengthOfNewLine,
+                midPoint.Z + unitVectorOfNewLine.Z * lengthOfNewLine
             );
 
-            Line newPerpendicularLine = theWorkPart.Curves.CreateLine(midPoint,perpendicularEndPointForNewLine);
+            Line newPerpendicularLine = workPart.Curves.CreateLine(midPoint, perpendicularEndPointForNewLine);
         }
 
         public void CreatingPlanes(Point startPoint)
@@ -359,33 +365,33 @@ namespace NXOpenCS
             //along ZX plane Normal to Y axis       -> Xaxis(1,0,0)    Yaxis(0,0,1)    Zaxis(0,1,0)
 
             //Lets create a plane via a point which is create on above method, along XY plane by taking workPart matrix
-            Matrix3x3 wcsMatrix = theWorkPart.WCS.CoordinateSystem.Orientation.Element;  //This will collect Matrix along XY
-            Point3d origin=new Point3d(startPoint.Coordinates.X,startPoint.Coordinates.Y,startPoint.Coordinates.Z);
-            DatumPlane sketchPlane=theWorkPart.Datums.CreateFixedDatumPlane(origin, wcsMatrix);
+            Matrix3x3 wcsMatrix = workPart.WCS.CoordinateSystem.Orientation.Element;  //This will collect Matrix along XY
+            Point3d origin = new Point3d(startPoint.Coordinates.X, startPoint.Coordinates.Y, startPoint.Coordinates.Z);
+            DatumPlane sketchPlane = workPart.Datums.CreateFixedDatumPlane(origin, wcsMatrix);
 
-            lw.WriteLine(("Xx = "+wcsMatrix.Xx, "Xy = " + wcsMatrix.Xy, "Xz = " + wcsMatrix.Xz).ToString());
-            lw.WriteLine(("Yx = "+wcsMatrix.Yx, "Yy = " + wcsMatrix.Yy, "Yz = " + wcsMatrix.Yz).ToString());
-            lw.WriteLine(("Zx = "+wcsMatrix.Zx, "Zy = " + wcsMatrix.Zy, "Zz = " + wcsMatrix.Zz).ToString());
+            lw.WriteLine(("Xx = " + wcsMatrix.Xx, "Xy = " + wcsMatrix.Xy, "Xz = " + wcsMatrix.Xz).ToString());
+            lw.WriteLine(("Yx = " + wcsMatrix.Yx, "Yy = " + wcsMatrix.Yy, "Yz = " + wcsMatrix.Yz).ToString());
+            lw.WriteLine(("Zx = " + wcsMatrix.Zx, "Zy = " + wcsMatrix.Zy, "Zz = " + wcsMatrix.Zz).ToString());
 
             //Creating plane via point, along XZ axis and normal to Y
-            Matrix3x3 xzMatrix=new Matrix3x3();
-            xzMatrix.Xx=1; xzMatrix.Xy=0; xzMatrix.Xz=0;
-            xzMatrix.Yx=0; xzMatrix.Yy=0;xzMatrix.Yz=1;
-            xzMatrix.Zx=0;xzMatrix.Zy=1;xzMatrix.Zz=0;
+            Matrix3x3 xzMatrix = new Matrix3x3();
+            xzMatrix.Xx = 1; xzMatrix.Xy = 0; xzMatrix.Xz = 0;
+            xzMatrix.Yx = 0; xzMatrix.Yy = 0; xzMatrix.Yz = 1;
+            xzMatrix.Zx = 0; xzMatrix.Zy = 1; xzMatrix.Zz = 0;
 
-            DatumPlane xzPlane = theWorkPart.Datums.CreateFixedDatumPlane(origin,xzMatrix);
+            DatumPlane xzPlane = workPart.Datums.CreateFixedDatumPlane(origin, xzMatrix);
 
 
             //Creating a plane with some angle
             // Calculate components of the normal vector
             //CreateFixedDatumPlane:
-                // Use when you need a persistent and reusable reference plane for building features.
-                //Example: Creating a sketch plane that stays in the part's feature tree.
+            // Use when you need a persistent and reusable reference plane for building features.
+            //Example: Creating a sketch plane that stays in the part's feature tree.
             //CreateFixedPlane:
-                // Use when you need a temporary plane for programmatic calculations or intermediate steps.
-                //Example: Finding where a plane intersects a body without adding a datum plane to the model.
-            
-            Point3d originOriginal=new Point3d(0,0,0);
+            // Use when you need a temporary plane for programmatic calculations or intermediate steps.
+            //Example: Finding where a plane intersects a body without adding a datum plane to the model.
+
+            Point3d originOriginal = new Point3d(0, 0, 0);
             double angleInRadians = 53 * (Math.PI / 180.0); // Convert degrees to radians
             double normalZ = Math.Sin(angleInRadians); // Z-component
             double normalXY = Math.Cos(angleInRadians); // Length in XY plane
@@ -396,7 +402,7 @@ namespace NXOpenCS
             matrixZ.Yx = 0.0; matrixZ.Yy = 1.0; matrixZ.Yz = 0.0;          // Y-axis direction
             matrixZ.Zx = normalZ; matrixZ.Zy = 0.0; matrixZ.Zz = normalXY; // Z-axis direction (normal)
 
-            Plane planeZ = theWorkPart.Planes.CreateFixedPlane(originOriginal, matrixZ);
+            Plane planeZ = workPart.Planes.CreateFixedPlane(originOriginal, matrixZ);
 
             // 2. Plane normal to X (tilted 53 degrees to YZ)
             Matrix3x3 matrixX = new Matrix3x3();
@@ -404,7 +410,7 @@ namespace NXOpenCS
             matrixX.Yx = 0.0; matrixX.Yy = normalXY; matrixX.Yz = normalZ; // Y-axis direction
             matrixX.Zx = 0.0; matrixX.Zy = -normalZ; matrixX.Zz = normalXY; // Z-axis direction (normal)
 
-            Plane planeX = theWorkPart.Planes.CreateFixedPlane(originOriginal, matrixX);
+            Plane planeX = workPart.Planes.CreateFixedPlane(originOriginal, matrixX);
 
             // 3. Plane normal to Y (tilted 53 degrees to ZX)
             Matrix3x3 matrixY = new Matrix3x3();
@@ -412,9 +418,9 @@ namespace NXOpenCS
             matrixY.Yx = -normalZ; matrixY.Yy = normalXY; matrixY.Yz = 0.0; // Y-axis direction
             matrixY.Zx = 0.0; matrixY.Zy = 0.0; matrixY.Zz = 1.0;          // Z-axis direction (normal)
 
-            Plane planeY = theWorkPart.Planes.CreateFixedPlane(originOriginal, matrixY);
+            Plane planeY = workPart.Planes.CreateFixedPlane(originOriginal, matrixY);
 
-            SketchInPlaceBuilder sketchInPlaceBuilder = theWorkPart.Sketches.CreateSketchInPlaceBuilder2(null);
+            SketchInPlaceBuilder sketchInPlaceBuilder = workPart.Sketches.CreateSketchInPlaceBuilder2(null);
 
             //sketchInPlaceBuilder.plan = sketchPlane;
             //sketchInPlaceBuilder.PlaneReference.Direction = Sketch.Direction.Normal; // Sketch normal to the plane
@@ -442,17 +448,93 @@ namespace NXOpenCS
         public void GetDirections()
         {
             int faceType;
-            double[] pointInfo= new double[3];
-            double[] direction= new double[3];
-            double[] box= new double[6];
+            double[] pointInfo = new double[3];
+            double[] direction = new double[3];
+            double[] box = new double[6];
             double radius;
             double radData;
             int normDir;
-            theUFSession.Modl.AskFaceData(lsFaces[0].Tag, out faceType, pointInfo, direction, box, out radius, out radData, out normDir);
+            theUFSession.Modl.AskFaceData(lsFaces[8].Tag, out faceType, pointInfo, direction, box, out radius, out radData, out normDir);
+
+            lsFaces[8].Highlight();
 
             lw.WriteLine(Convert.ToString(direction[0]));
             lw.WriteLine(Convert.ToString(direction[1]));
             lw.WriteLine(Convert.ToString(direction[2]));
+
+            CreateAPoint(pointInfo[0], pointInfo[1], pointInfo[2]);
+
+            lw.WriteLine("Point");
+
+            lw.WriteLine(Convert.ToString(pointInfo[0]));
+            lw.WriteLine(Convert.ToString(pointInfo[1]));
+            lw.WriteLine(Convert.ToString(pointInfo[2]));
+        }
+
+        public void GetCGFromFace()
+        {
+
+        }
+
+        public void CreateAPoint(double x,double y,double z)
+        {
+
+            NXOpen.Point point6; 
+            point6 =workPart.Points.CreatePoint(new Point3d(x,y,z)); 
+
+            point6.SetVisibility(NXOpen.SmartObject.VisibilityOption.Visible); 
+            NXOpen.Features.Feature nullNXOpen_Features_Feature= null;
+            NXOpen.Features.PointFeatureBuilder pointFeatureBuilder1;
+            pointFeatureBuilder1 = workPart.BaseFeatures.CreatePointFeatureBuilder(nullNXOpen_Features_Feature); 
+
+            pointFeatureBuilder1.Point=point6; 
+            NXOpen.NXObject nXObject1; 
+            nXObject1 = pointFeatureBuilder1.Commit(); 
+            pointFeatureBuilder1.Destroy();
+        }
+
+        public void SegrigateCurves()
+        {
+            List<Line> lines = new List<Line>();
+            List<Arc> arcs = new List<Arc>();
+            List<Arc> circles = new List<Arc>();
+            List<Spline> splines = new List<Spline>();
+            List<Curve> otherCurves = new List<Curve>();
+
+            Curve[] curves = workPart.Curves.ToArray();
+
+            foreach (Curve curve in curves) 
+            {
+                switch (curve.GetType().ToString())
+                {
+                    case "NXOpen.Line":
+                        lines.Add((Line)curve);
+                        break;
+                    case "NXOpen.Arc":
+                        if (Math.Abs(((Arc)curve).EndAngle - ((Arc)curve).StartAngle) >= (2 * Math.PI))
+                        {
+                            circles.Add((Arc)curve);
+                        }
+                        else
+                        {
+                            arcs.Add((Arc)curve);
+                        }
+                        break;
+                    case "NXOpen.Spline":
+                        splines.Add((Spline)curve);
+                        break;
+
+                    default:
+                        otherCurves.Add(curve);
+                        break;
+                }
+            }
+
+            lw.WriteLine($"Lines: {lines.Count}");
+            lw.WriteLine($"Arcs: {arcs.Count}");
+            lw.WriteLine($"Circles: {circles.Count}");
+            lw.WriteLine($"Splines: {splines.Count}");
+            lw.WriteLine($"Others: {otherCurves.Count}");
         }
     }
 }

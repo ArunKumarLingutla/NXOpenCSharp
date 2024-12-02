@@ -13,7 +13,8 @@ namespace NXOpenCS
             //Source.GetAllComponents();
             //source.AddComponentsToAssembly();
             source.DisplayInfoInLW();
-            source.GetDirections();
+            source.SegrigateCurves();
+            //source.GetDirections();
             //source.CreateLine();
             //source.CreatePointPerpendicularToLine();
             //source.CreateLinePerpendicularToExistingLine();
