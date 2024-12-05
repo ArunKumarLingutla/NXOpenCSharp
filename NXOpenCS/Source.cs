@@ -13,6 +13,9 @@ using System.IO;
 using Body = NXOpen.Body;
 using Part = NXOpen.Part;
 using NXOpen.Markup;
+using NXOpen.Utilities;
+using static NXOpen.Features.SectionSurfaceBuilderEx;
+using static NXOpen.UF.UFModl;
 
 namespace NXOpenCS
 {
@@ -21,7 +24,7 @@ namespace NXOpenCS
         //Taking NXSession, and collecting work and display parts from NXSession
         public static Session theSession;
         public static Part workPart;
-        public static Part theDisplayPart;
+        public static Part displayPart;
         public static ListingWindow lw;
         public static UFSession theUFSession;
         public static DisplayManager theDisplayManager;
@@ -43,7 +46,7 @@ namespace NXOpenCS
             //Initialising the session and parts from NX when ever Object is created for source class
             theSession = NXOpen.Session.GetSession();
             workPart = theSession.Parts.Work;
-            theDisplayPart = theSession.Parts.Display;
+            displayPart = theSession.Parts.Display;
             theDisplayManager = theSession.DisplayManager;
             lw = theSession.ListingWindow;
             lw.Open();
@@ -65,13 +68,13 @@ namespace NXOpenCS
             try
             {
                 //If the display part is not an assembly than root component will be null
-                if (theDisplayPart.ComponentAssembly.RootComponent is null)
+                if (displayPart.ComponentAssembly.RootComponent is null)
                 {
                     lw.WriteLine("It is not an assembly");
                 }
                 else
                 {
-                    NXOpen.Assemblies.Component rootComponent = theDisplayPart.ComponentAssembly.RootComponent;
+                    NXOpen.Assemblies.Component rootComponent = displayPart.ComponentAssembly.RootComponent;
 
                     //Going layer by level by level and getting all the child components
                     //storing current level components into "currentLevelComponents" list and traversing them to get their child components
@@ -105,9 +108,9 @@ namespace NXOpenCS
             try
             {
                 //If the 
-                if (theDisplayPart != null && theDisplayPart.ComponentAssembly.RootComponent is null)
+                if (displayPart != null && displayPart.ComponentAssembly.RootComponent is null)
                 {
-                    lsBodies.AddRange(theDisplayPart.Bodies.ToArray());
+                    lsBodies.AddRange(displayPart.Bodies.ToArray());
                 }
                 else
                 {
@@ -136,6 +139,36 @@ namespace NXOpenCS
                 lsFaces.AddRange(body.GetFaces());
             }
         }
+        public void GetBodiesAndFacesFromAssembly(out List<Body> bodies,out List<Face> faces)
+        {
+            //This will collect all the solid bodies from the display doesn't matter wether it is in assembly or part
+
+            bodies = new List<Body>(); 
+            faces= new List<Face>(); 
+
+            Tag body=Tag.Null;
+
+            theUFSession.Obj.CycleObjsInPart(displayPart.Tag, UFConstants.UF_solid_type, ref body);
+            while (body != Tag.Null)
+            {
+                NXObject nXObject = (NXObject)NXObjectManager.Get(body);
+                if (nXObject is Body) { 
+                    int bodyType; 
+                    theUFSession.Modl.AskBodyType(body, out bodyType);
+                    if (bodyType is UFConstants.UF_MODL_SOLID_BODY){ 
+                        Body bdy = (Body)NXObjectManager.Get(body);
+                        if (bdy != null) { 
+                            bodies.Add(bdy); 
+                            faces.AddRange(bdy.GetFaces()); 
+                        }
+                    }
+                }
+                theUFSession.Obj.CycleObjsInPart(displayPart.Tag, UFConstants.UF_solid_type, ref body);
+            }
+            lw.WriteLine($"no of bodies: {bodies.Count}");
+            lw.WriteLine($"no of faces: {faces.Count}");
+
+        }
         public void GetEdges()
         {
             if (lsBodies.Count == 0)
@@ -146,7 +179,6 @@ namespace NXOpenCS
             {
                 lsEdgesFromFaces.AddRange(face.GetEdges());
             }
-
             foreach (Body body in lsBodies)
             {
                 lsEdgesFromBodies.AddRange(body.GetEdges());
@@ -157,25 +189,22 @@ namespace NXOpenCS
             GetBodies();
             GetFaces();
             GetEdges();
-
             lw.WriteLine($"No Of Bodies: {lsBodies.Count}");
             lw.WriteLine($"No Of Faces: {lsFaces.Count}");
             lw.WriteLine($"No Of Edges: {lsEdgesFromBodies.Count}");
-
-            if (!(theDisplayPart.ComponentAssembly.RootComponent is null))
+            if (!(displayPart.ComponentAssembly.RootComponent is null))
             {
                 if (assemblies.Count > 0)
                 {
-                    lw.WriteLine("Assemblies in " + theDisplayPart.ComponentAssembly.RootComponent.DisplayName + " are: ");
+                    lw.WriteLine("Assemblies in " + displayPart.ComponentAssembly.RootComponent.DisplayName + " are: ");
                     foreach (Component component in assemblies)
                     {
                         lw.WriteLine(component.DisplayName);
                     }
                 }
-
                 if (components.Count > 0)
                 {
-                    lw.WriteLine("Components in " + theDisplayPart.ComponentAssembly.RootComponent.DisplayName + " are: ");
+                    lw.WriteLine("Components in " + displayPart.ComponentAssembly.RootComponent.DisplayName + " are: ");
                     foreach (Component component in components)
                     {
                         lw.WriteLine(component.DisplayName);
@@ -183,7 +212,6 @@ namespace NXOpenCS
                 }
             }
         }
-
         public void AddComponentsToAssembly()
         {
             try
@@ -193,7 +221,6 @@ namespace NXOpenCS
                 {
                     lw.WriteLine("Folder does not exists...");
                 }
-
                 else
                 {
                     string[] partFiles = Directory.GetFiles(folderPath, "*.prt");
@@ -201,7 +228,6 @@ namespace NXOpenCS
                     {
                         lw.WriteLine($"No part files present in {folderPath}");
                     }
-
                     else
                     {
                         foreach (string partFile in partFiles)
@@ -212,9 +238,8 @@ namespace NXOpenCS
                             Matrix3x3 wcsMatrix = workPart.WCS.CoordinateSystem.Orientation.Element;
                             int layer = -1;
                             PartLoadStatus partLoadStatus;
-
                             Component newComponent = workPart.ComponentAssembly.AddComponent
-                                (partFile, referenceSetName, componentName, basePoint, wcsMatrix, layer, out partLoadStatus);
+                            (partFile, referenceSetName, componentName, basePoint, wcsMatrix, layer, out partLoadStatus);
                             lw.WriteLine($"Part Loaded: {componentName}");
                         }
                         workPart.Save(BasePart.SaveComponents.False, BasePart.CloseAfterSave.False);
@@ -226,7 +251,6 @@ namespace NXOpenCS
                 theUI.NXMessageBox.Show("Exception", NXMessageBox.DialogType.Error, e.Message.ToString());
             }
         }
-
         public void CreateLine()
         {
             Point3d startPoint = new Point3d(0, 0, 0);
@@ -462,7 +486,7 @@ namespace NXOpenCS
             lw.WriteLine(Convert.ToString(direction[1]));
             lw.WriteLine(Convert.ToString(direction[2]));
 
-            CreateAPoint(pointInfo[0], pointInfo[1], pointInfo[2]);
+            CreateAPointAsFeature(pointInfo[0], pointInfo[1], pointInfo[2]);
 
             lw.WriteLine("Point");
 
@@ -476,7 +500,7 @@ namespace NXOpenCS
 
         }
 
-        public void CreateAPoint(double x,double y,double z)
+        public void CreateAPointAsFeature(double x,double y,double z)
         {
 
             NXOpen.Point point6; 
@@ -495,6 +519,11 @@ namespace NXOpenCS
 
         public void SegrigateCurves()
         {
+            //We can use UF API to do this such as
+            //UF_EVAL_initialize
+            //UF_EVAL_is_arc
+            //UF_EVAL_is_ellipse
+
             List<Line> lines = new List<Line>();
             List<Arc> arcs = new List<Arc>();
             List<Arc> circles = new List<Arc>();
@@ -535,6 +564,35 @@ namespace NXOpenCS
             lw.WriteLine($"Circles: {circles.Count}");
             lw.WriteLine($"Splines: {splines.Count}");
             lw.WriteLine($"Others: {otherCurves.Count}");
+
+            //to find length of line, center point or radius of arc or circle
+            IntPtr evalu;
+            theUFSession.Eval.Initialize(curves[0].Tag, out evalu);
+            if (curves[0] is Line) 
+            {
+                UFEval.Line line;
+                theUFSession.Eval.AskLine(evalu, out line);
+                double d=line.length;
+                lw.WriteLine($"Length of line: {d}");
+            }
+        }
+
+        public void GetSpecificComponentFromNamedFace()
+        {
+            string faceName = "RECFACE";
+            Component reqComponent;
+            List<Body> bodies;
+            List<Face> faces;
+            GetBodiesAndFacesFromAssembly(out bodies,out faces);
+
+            foreach (Face face in faces)
+            {
+                if (face.Name.ToUpper() == faceName)
+                {
+                    Body reqBody=face.GetBody();
+                    reqComponent = reqBody.OwningComponent;
+                }
+            }
         }
     }
 }
